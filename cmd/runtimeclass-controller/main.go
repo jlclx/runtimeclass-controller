@@ -58,7 +58,7 @@ func main() {
 		Handler: mux,
 	}
 
-	if err := server.ListenAndServeTLS("/certs/crt.pem", "/certs/key.pem"); err != nil {
+	if err := server.ListenAndServeTLS("/certs/tls.crt", "/certs/tls.key"); err != nil {
 		log.Errorf("Failed to listen and serve: %v", err)
 	}
 }
