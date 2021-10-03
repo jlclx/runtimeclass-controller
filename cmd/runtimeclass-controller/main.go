@@ -148,25 +148,23 @@ func (c *controller) Patch(r *admission.AdmissionRequest) (*PatchResult, error) 
 		}, err
 	}
 
-	log.Infof("Got CREATE for %s/%s", pod.Namespace, pod.Name)
+	namespace, err := c.client.CoreV1().Namespaces().Get(context.TODO(), pod.Namespace, meta.GetOptions{})
+	if err != nil {
+		// Currently, silently fail.
+		return &PatchResult{
+			Allowed: true,
+		}, nil
+	}
 
-	if pod.Spec.RuntimeClassName == nil {
-		log.Infof("%s/%s lacks runtimeClassName", pod.Namespace, pod.Name)
-
-		namespace, err := c.client.CoreV1().Namespaces().Get(context.TODO(), pod.Namespace, meta.GetOptions{})
-		if err != nil {
-			return &PatchResult{
-				Message: err.Error(),
-			}, err
-		}
-
-		if val, ok := namespace.Labels["runtimeclassname-default"]; ok {
-			log.Infof("%s default runtimeClassName = %s", pod.Namespace, val)
+	if classname, ok := namespace.Labels["runtimeclassname-default"]; ok {
+		if pod.Spec.RuntimeClassName == nil {
+			log.Infof("%s/%s lacks runtimeClassName", pod.Namespace, pod.Name)
+			log.Infof("%s default runtimeClassName = %s", pod.Namespace, classname)
 
 			patches = append(patches, Patch{
 				Operation: "add",
 				Path:      "/spec/runtimeClassName",
-				Value:     val,
+				Value:     classname,
 			})
 
 			return &PatchResult{
@@ -175,8 +173,6 @@ func (c *controller) Patch(r *admission.AdmissionRequest) (*PatchResult, error) 
 			}, nil
 		}
 	}
-
-	log.Info("No patch applied")
 
 	return &PatchResult{
 		Allowed: true,
