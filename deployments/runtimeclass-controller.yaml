@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: runtimeclass-controller
+  namespace: runtimeclass-controller
+  labels:
+    app: runtimeclass-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: runtimeclass-controller
+  template:
+    metadata:
+      labels:
+        app: runtimeclass-controller
+    spec:
+      containers:
+        - name: runtimeclass-controller
+          image: ghcr.io/jlclx/runtimeclass-controller:latest
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8443
+              scheme: HTTPS
+          ports:
+            - containerPort: 8443
+          volumeMounts:
+            - name: webhook-certs
+              mountPath: /certs
+              readOnly: true
+      volumes:
+        - name: webhook-certs
+          secret:
+            secretName: runtimeclass-controller-certs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: runtimeclass-controller
+  namespace: runtimeclass-controller
+spec:
+  selector:
+    app: runtimeclass-controller
+  ports:
+    - port: 443
+      targetPort: 8443
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: runtimeclass-controller
+  namespace: runtimeclass-controller
+webhooks:
+  - name: runtimeclass-controller.default.svc
+    clientConfig:
+      service:
+        name: runtimeclass-controller
+        namespace: runtimeclass-controller
+        path: "/mutate"
+      caBundle: ${CA_BUNDLE}
+    rules:
+      - operations: ["CREATE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+    failurePolicy: Ignore
