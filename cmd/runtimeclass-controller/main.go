@@ -65,7 +65,6 @@ func main() {
 
 func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	log.Info("Serving request")
 
 	if r.Method != http.MethodPost {
 		http.Error(w, fmt.Sprint("POST only"), http.StatusMethodNotAllowed)
@@ -133,7 +132,6 @@ func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Info("Patch sent")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(responseJson)
 }
