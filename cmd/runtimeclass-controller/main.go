@@ -173,7 +173,7 @@ func (c *controller) Patch(r *admission.AdmissionRequest) (*PatchResult, error) 
 		}
 	}
 
-	log.Infof("No patch applied", pod.Namespace)
+	log.Info("No patch applied")
 
 	return &PatchResult{
 		Allowed: true,
