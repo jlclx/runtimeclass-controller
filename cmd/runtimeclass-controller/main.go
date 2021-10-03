@@ -139,7 +139,11 @@ func (c *controller) Patch(r *admission.AdmissionRequest) (*PatchResult, error) 
 		}, nil
 	}
 
+	log.Infof("Got CREATE for %s/%s", pod.Namespace, pod.Name)
+
 	if pod.Spec.RuntimeClassName == nil {
+		log.Infof("%s/%s lacks runtimeClassName", pod.Namespace, pod.Name)
+
 		namespace, err := c.client.CoreV1().Namespaces().Get(context.TODO(), pod.Namespace, meta.GetOptions{})
 		if err != nil {
 			return &PatchResult{
@@ -148,6 +152,8 @@ func (c *controller) Patch(r *admission.AdmissionRequest) (*PatchResult, error) 
 		}
 
 		if val, ok := namespace.Labels["runtimeclassname-default"]; ok {
+			log.Infof("%s default runtimeClassName = %s", pod.Namespace, val)
+
 			patches = append(patches, Patch{
 				Operation: "add",
 				Path:      "/spec/runtimeClassName",
