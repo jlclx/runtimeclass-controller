@@ -116,12 +116,14 @@ func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(result.Patches) > 0 {
+		JSONPatch := admission.PatchTypeJSONPatch
 		patches, err := json.Marshal(result.Patches)
 		if err != nil {
 			log.Error(err)
 			http.Error(w, fmt.Sprintf("Could not serialize JSON patch: %v", err), http.StatusInternalServerError)
 		}
 		response.Response.Patch = patches
+		response.Response.PatchType = &JSONPatch
 	}
 
 	responseJson, err := json.Marshal(response)
