@@ -147,7 +147,7 @@ func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 
 func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, error) {
 	var p *PatchIntent
-	log.Infof("%s triggered", r.Resource.Group)
+	log.Infof("%s triggered", r.RequestResource.Resource)
 	switch r.Resource.Group {
 	case "pods":
 		var pod core.Pod
