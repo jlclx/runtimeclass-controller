@@ -52,7 +52,7 @@ func main() {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", c.health)
-	mux.HandleFunc("/mutate", c.Serve)
+	mux.HandleFunc("/mutate", c.Mutate)
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":8443"),
 		Handler: mux,
@@ -63,38 +63,39 @@ func main() {
 	}
 }
 
-func (c *controller) Serve(w http.ResponseWriter, r *http.Request) {
+func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	log.Info("Serving request")
 
 	if r.Method != http.MethodPost {
 		http.Error(w, fmt.Sprint("POST only"), http.StatusMethodNotAllowed)
-		log.Error("invalid method")
+		log.Error("Invalid method")
 		return
 	}
 
 	if contentType := r.Header.Get("Content-Type"); contentType != "application/json" {
 		http.Error(w, fmt.Sprint("application/json content only"), http.StatusBadRequest)
-		log.Error("invalid content/type")
+		log.Error("Invalid content/type")
 		return
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("bad request body"), http.StatusBadRequest)
-		log.Error("invalid body")
+		log.Error("Invalid body")
 		return
 	}
 
 	var review admission.AdmissionReview
 	if _, _, err := c.deserializer.Decode(body, nil, &review); err != nil {
-		http.Error(w, fmt.Sprintf("failed to decode request: %v", err), http.StatusBadRequest)
-		log.Error("invalid body")
+		http.Error(w, fmt.Sprintf("Failed to decode request: %v", err), http.StatusBadRequest)
+		log.Error("Invalid review")
 		return
 	}
 
 	if review.Request == nil {
-		http.Error(w, "bad admission review", http.StatusBadRequest)
-		log.Error("bad admission review")
+		http.Error(w, "Bad admission review", http.StatusBadRequest)
+		log.Error("Bad admission review")
 		return
 	}
 
@@ -117,7 +118,7 @@ func (c *controller) Serve(w http.ResponseWriter, r *http.Request) {
 		patches, err := json.Marshal(result.Patches)
 		if err != nil {
 			log.Error(err)
-			http.Error(w, fmt.Sprintf("could not serialize JSON patch: %v", err), http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("Could not serialize JSON patch: %v", err), http.StatusInternalServerError)
 		}
 		response.Response.Patch = patches
 	}
@@ -125,7 +126,7 @@ func (c *controller) Serve(w http.ResponseWriter, r *http.Request) {
 	responseJson, err := json.Marshal(response)
 	if err != nil {
 		log.Error(err)
-		http.Error(w, fmt.Sprintf("could not serialize admission response: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Could not serialize admission response: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -172,7 +173,7 @@ func (c *controller) Patch(r *admission.AdmissionRequest) (*PatchResult, error) 
 		}
 	}
 
-	log.Infof("no patch applied", pod.Namespace, val)
+	log.Infof("No patch applied", pod.Namespace, val)
 
 	return &PatchResult{
 		Allowed: true,
