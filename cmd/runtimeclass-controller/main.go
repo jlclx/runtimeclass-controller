@@ -133,15 +133,7 @@ func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responseJsonPretty, err := json.MarshalIndent(response, "", "    ")
-	if err != nil {
-		log.Error(err)
-		http.Error(w, fmt.Sprintf("Could not serialize admission response: %v", err), http.StatusInternalServerError)
-		return
-	}
-	log.Infof("Reply: %s", string(responseJsonPretty))
-
-	log.Infof("Webhook [%s - %s] - Allowed: %t", r.URL.Path, review.Request.Operation, result.Allowed)
+	log.Info("Patch sent")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(responseJson)
 }
