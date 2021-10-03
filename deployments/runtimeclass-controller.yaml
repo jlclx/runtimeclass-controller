@@ -68,4 +68,5 @@ webhooks:
         apiGroups: [""]
         apiVersions: ["v1"]
         resources: ["pods"]
+        scope: "*"
     failurePolicy: Ignore

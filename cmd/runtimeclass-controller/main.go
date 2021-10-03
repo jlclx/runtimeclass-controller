@@ -68,28 +68,33 @@ func (c *controller) Serve(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		http.Error(w, fmt.Sprint("POST only"), http.StatusMethodNotAllowed)
+		log.Error("invalid method")
 		return
 	}
 
 	if contentType := r.Header.Get("Content-Type"); contentType != "application/json" {
 		http.Error(w, fmt.Sprint("application/json content only"), http.StatusBadRequest)
+		log.Error("invalid content/type")
 		return
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("bad request body"), http.StatusBadRequest)
+		log.Error("invalid body")
 		return
 	}
 
 	var review admission.AdmissionReview
 	if _, _, err := c.deserializer.Decode(body, nil, &review); err != nil {
 		http.Error(w, fmt.Sprintf("failed to decode request: %v", err), http.StatusBadRequest)
+		log.Error("invalid body")
 		return
 	}
 
 	if review.Request == nil {
 		http.Error(w, "bad admission review", http.StatusBadRequest)
+		log.Error("bad admission review")
 		return
 	}
 
@@ -136,7 +141,7 @@ func (c *controller) Patch(r *admission.AdmissionRequest) (*PatchResult, error) 
 	if err := json.Unmarshal(r.Object.Raw, &pod); err != nil {
 		return &PatchResult{
 			Message: err.Error(),
-		}, nil
+		}, err
 	}
 
 	log.Infof("Got CREATE for %s/%s", pod.Namespace, pod.Name)
@@ -148,7 +153,7 @@ func (c *controller) Patch(r *admission.AdmissionRequest) (*PatchResult, error) 
 		if err != nil {
 			return &PatchResult{
 				Message: err.Error(),
-			}, nil
+			}, err
 		}
 
 		if val, ok := namespace.Labels["runtimeclassname-default"]; ok {
