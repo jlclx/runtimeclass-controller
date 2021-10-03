@@ -17,8 +17,8 @@ import (
 )
 
 type controller struct {
-	 deserializer runtime.Decoder
-	 client *kubernetes.Clientset
+	deserializer runtime.Decoder
+	client       *kubernetes.Clientset
 }
 
 type PatchResult struct {
@@ -28,10 +28,10 @@ type PatchResult struct {
 }
 
 type Patch struct {
-	Operation string `json:"op"`
-	Path      string `json:"path"`
-	From  string      `json:"from"`
-	Value interface{} `json:"value,omitempty"`
+	Operation string      `json:"op"`
+	Path      string      `json:"path"`
+	From      string      `json:"from"`
+	Value     interface{} `json:"value,omitempty"`
 }
 
 func main() {
@@ -48,13 +48,13 @@ func main() {
 
 	c := controller{
 		deserializer: serializer.NewCodecFactory(runtime.NewScheme()).UniversalDeserializer(),
-		client: clientset,
+		client:       clientset,
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", c.health)
 	mux.HandleFunc("/mutate", c.Serve)
 	server := &http.Server{
-		Addr:    fmt.Sprintf(":8080"),
+		Addr:    fmt.Sprintf(":8443"),
 		Handler: mux,
 	}
 
@@ -62,7 +62,6 @@ func main() {
 		log.Errorf("Failed to listen and serve: %v", err)
 	}
 }
-
 
 func (c *controller) Serve(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -118,7 +117,6 @@ func (c *controller) Serve(w http.ResponseWriter, r *http.Request) {
 		response.Response.Patch = patches
 	}
 
-
 	responseJson, err := json.Marshal(response)
 	if err != nil {
 		log.Error(err)
@@ -141,9 +139,8 @@ func (c *controller) Patch(r *admission.AdmissionRequest) (*PatchResult, error) 
 		}, nil
 	}
 
-	//if pod.Namespace {
 	if pod.Spec.RuntimeClassName == nil {
-		namespace, err:= c.client.CoreV1().Namespaces().Get(context.TODO(), pod.Namespace, meta.GetOptions{})
+		namespace, err := c.client.CoreV1().Namespaces().Get(context.TODO(), pod.Namespace, meta.GetOptions{})
 		if err != nil {
 			return &PatchResult{
 				Message: err.Error(),
@@ -169,7 +166,7 @@ func (c *controller) Patch(r *admission.AdmissionRequest) (*PatchResult, error) 
 	}, nil
 }
 
-func (c *controller) health(w http.ResponseWriter, r *http.Request) {
+func (c *controller) health(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
 }
