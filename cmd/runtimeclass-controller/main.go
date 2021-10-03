@@ -146,7 +146,8 @@ func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, error) {
-	var p PatchIntent
+	var p *PatchIntent
+	log.Infof("%s triggered", r.Resource.Group)
 	switch r.Resource.Group {
 	case "pods":
 		var pod core.Pod
@@ -156,7 +157,7 @@ func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 			}, err
 		}
 
-		p = PatchIntent{
+		p = &PatchIntent{
 			runtimeClassName: pod.Spec.RuntimeClassName,
 			group:            r.Resource.Group,
 			namespace:        pod.Namespace,
@@ -165,12 +166,14 @@ func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 		}
 	}
 
-	patches, err := c.CreatePatches(&p)
-	if err == nil {
-		return &PatchResult{
-			Allowed: true,
-			Patches: *patches,
-		}, nil
+	if p != nil {
+		patches, err := c.CreatePatches(p)
+		if err == nil {
+			return &PatchResult{
+				Allowed: true,
+				Patches: *patches,
+			}, nil
+		}
 	}
 
 	return &PatchResult{
