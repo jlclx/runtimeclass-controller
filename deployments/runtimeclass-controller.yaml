@@ -53,7 +53,7 @@ metadata:
   name: runtimeclass-controller
   namespace: runtimeclass-controller
 webhooks:
-  - name: runtimeclass-controller.default.svc
+  - name: runtimeclass-controller.runtimeclass-controller.svc
     sideEffects: None
     admissionReviewVersions:
       - "v1"
