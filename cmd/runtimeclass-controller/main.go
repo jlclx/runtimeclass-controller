@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	admission "k8s.io/api/admission/v1"
@@ -34,8 +35,15 @@ type Patch struct {
 	Value     interface{} `json:"value,omitempty"`
 }
 
-func main() {
+type PatchIntent struct {
+	runtimeClassName *string
+	group            string
+	namespace        string
+	name             string
+	path             string
+}
 
+func main() {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		panic(err.Error())
@@ -50,6 +58,7 @@ func main() {
 		deserializer: serializer.NewCodecFactory(runtime.NewScheme()).UniversalDeserializer(),
 		client:       clientset,
 	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", c.health)
 	mux.HandleFunc("/mutate", c.Mutate)
@@ -59,7 +68,7 @@ func main() {
 	}
 
 	if err := server.ListenAndServeTLS("/certs/tls.crt", "/certs/tls.key"); err != nil {
-		log.Errorf("Failed to listen and serve: %v", err)
+		log.Errorf("failed to listen and serve: %v", err)
 	}
 }
 
@@ -68,37 +77,37 @@ func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		http.Error(w, fmt.Sprint("POST only"), http.StatusMethodNotAllowed)
-		log.Error("Invalid method")
+		log.Error("invalid method")
 		return
 	}
 
 	if contentType := r.Header.Get("Content-Type"); contentType != "application/json" {
 		http.Error(w, fmt.Sprint("application/json content only"), http.StatusBadRequest)
-		log.Error("Invalid content/type")
+		log.Error("invalid content/type")
 		return
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("bad request body"), http.StatusBadRequest)
-		log.Error("Invalid body")
+		log.Error("invalid body")
 		return
 	}
 
 	var review admission.AdmissionReview
 	if _, _, err := c.deserializer.Decode(body, nil, &review); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to decode request: %v", err), http.StatusBadRequest)
-		log.Error("Invalid review")
+		http.Error(w, fmt.Sprintf("failed to decode request: %v", err), http.StatusBadRequest)
+		log.Error("invalid review")
 		return
 	}
 
 	if review.Request == nil {
-		http.Error(w, "Bad admission review", http.StatusBadRequest)
-		log.Error("Bad admission review")
+		http.Error(w, "bad admission review", http.StatusBadRequest)
+		log.Error("bad admission review")
 		return
 	}
 
-	result, err := c.Patch(review.Request)
+	result, err := c.GetPatches(review.Request)
 	if err != nil {
 		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -119,7 +128,7 @@ func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 		patches, err := json.Marshal(result.Patches)
 		if err != nil {
 			log.Error(err)
-			http.Error(w, fmt.Sprintf("Could not serialize JSON patch: %v", err), http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("could not serialize JSON patch: %v", err), http.StatusInternalServerError)
 		}
 		response.Response.Patch = patches
 		response.Response.PatchType = &JSONPatch
@@ -128,7 +137,7 @@ func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 	responseJson, err := json.Marshal(response)
 	if err != nil {
 		log.Error(err)
-		http.Error(w, fmt.Sprintf("Could not serialize admission response: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("could not serialize admission response: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -136,45 +145,63 @@ func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(responseJson)
 }
 
-func (c *controller) Patch(r *admission.AdmissionRequest) (*PatchResult, error) {
-	var patches []Patch
-	var pod core.Pod
+func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, error) {
+	var p PatchIntent
+	switch r.Resource.Group {
+	case "pods":
+		var pod core.Pod
+		if err := json.Unmarshal(r.Object.Raw, &pod); err != nil {
+			return &PatchResult{
+				Message: err.Error(),
+			}, err
+		}
 
-	if err := json.Unmarshal(r.Object.Raw, &pod); err != nil {
-		return &PatchResult{
-			Message: err.Error(),
-		}, err
+		p = PatchIntent{
+			runtimeClassName: pod.Spec.RuntimeClassName,
+			group:            r.Resource.Group,
+			namespace:        pod.Namespace,
+			name:             pod.Name,
+			path:             "/spec/runtimeClassName",
+		}
 	}
 
-	namespace, err := c.client.CoreV1().Namespaces().Get(context.TODO(), pod.Namespace, meta.GetOptions{})
-	if err != nil {
-		// Currently, silently fail.
+	patches, err := c.CreatePatches(&p)
+	if err == nil {
 		return &PatchResult{
 			Allowed: true,
+			Patches: *patches,
 		}, nil
-	}
-
-	if classname, ok := namespace.Labels["runtimeclassname-default"]; ok {
-		if pod.Spec.RuntimeClassName == nil {
-			log.Infof("%s/%s lacks runtimeClassName", pod.Namespace, pod.Name)
-			log.Infof("%s default runtimeClassName = %s", pod.Namespace, classname)
-
-			patches = append(patches, Patch{
-				Operation: "add",
-				Path:      "/spec/runtimeClassName",
-				Value:     classname,
-			})
-
-			return &PatchResult{
-				Allowed: true,
-				Patches: patches,
-			}, nil
-		}
 	}
 
 	return &PatchResult{
 		Allowed: true,
 	}, nil
+}
+
+func (c *controller) CreatePatches(p *PatchIntent) (*[]Patch, error) {
+	var patches []Patch
+
+	namespaceObj, err := c.client.CoreV1().Namespaces().Get(context.TODO(), p.namespace, meta.GetOptions{})
+	if err != nil {
+		// Currently, silently fail.
+		return &patches, err
+	}
+
+	if classname, ok := namespaceObj.Labels["runtimeclassname-default"]; ok {
+		if p.runtimeClassName == nil {
+			log.Infof("%s/%s in %s lacks runtimeClassName, default is %s", p.namespace, p.group, p.name, classname)
+
+			patches = append(patches, Patch{
+				Operation: "add",
+				Path:      p.path,
+				Value:     classname,
+			})
+
+			return &patches, nil
+		}
+	}
+
+	return &patches, errors.New("no patch applied")
 }
 
 func (c *controller) health(w http.ResponseWriter, _ *http.Request) {

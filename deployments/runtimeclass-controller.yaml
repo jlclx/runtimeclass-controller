@@ -97,6 +97,6 @@ webhooks:
       - operations: ["CREATE"]
         apiGroups: [""]
         apiVersions: ["v1"]
-        resources: ["pods"]
+        resources: ["pods", "deployments", "replicatsets", "statefulsets", "daemonsets", "jobs"]
         scope: "*"
     failurePolicy: Ignore
