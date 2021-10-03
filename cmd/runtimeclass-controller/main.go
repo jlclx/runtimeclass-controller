@@ -107,6 +107,7 @@ func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := admission.AdmissionReview{
+		TypeMeta: meta.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
 		Response: &admission.AdmissionResponse{
 			UID:     review.Request.UID,
 			Allowed: result.Allowed,
