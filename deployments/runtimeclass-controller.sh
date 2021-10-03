@@ -5,7 +5,7 @@ openssl genrsa -out $tmp/tls.key 2048 2>/dev/null
 openssl req -new -key $tmp/tls.key -subj "/CN=runtimeclass-controller.default.svc" 2>/dev/null | \
 openssl x509 -req -CA $tmp/ca.crt -CAkey $tmp/ca.key -CAcreateserial -out $tmp/tls.crt 2>/dev/null
 CA_BUNDLE=$(cat $tmp/ca.crt | base64 | tr -d '\n')
-kubectl create secret tls admission-tls \
+kubectl create secret tls runtimeclass-controller-certs \
     --cert "$tmp/tls.crt" \
     --key "$tmp/tls.key" \
     -o yaml --dry-run=client

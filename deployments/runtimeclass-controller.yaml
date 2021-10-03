@@ -54,6 +54,9 @@ metadata:
   namespace: runtimeclass-controller
 webhooks:
   - name: runtimeclass-controller.default.svc
+    sideEffects: None
+    admissionReviewVersions:
+      - "v1"
     clientConfig:
       service:
         name: runtimeclass-controller
