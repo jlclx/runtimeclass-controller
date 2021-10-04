@@ -149,7 +149,6 @@ func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 
 func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, error) {
 	var p *PatchIntent
-	log.Infof("%s triggered", r.RequestResource.Resource)
 	switch r.RequestResource.Resource {
 	case "pods":
 		var pod core.Pod
@@ -241,6 +240,21 @@ func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 			name:             job.Name,
 			path:             "/spec/template/spec/runtimeClassName",
 		}
+	case "cronjobs":
+		var cronJob batch.CronJob
+		if err := json.Unmarshal(r.Object.Raw, &cronJob); err != nil {
+			return &PatchResult{
+				Message: err.Error(),
+			}, err
+		}
+
+		p = &PatchIntent{
+			runtimeClassName: cronJob.Spec.JobTemplate.Spec.Template.Spec.RuntimeClassName,
+			resource:         r.RequestResource.Resource,
+			namespace:        cronJob.Namespace,
+			name:             cronJob.Name,
+			path:             "/jobTemplate/spec/template/spec/runtimeClassName",
+		}
 	}
 
 	if p != nil {
@@ -269,7 +283,7 @@ func (c *controller) CreatePatches(p *PatchIntent) (*[]Patch, error) {
 
 	if classname, ok := namespaceObj.Labels["runtimeclassname-default"]; ok {
 		if p.runtimeClassName == nil {
-			log.Infof("%s/%s in %s lacks runtimeClassName, default is %s", p.namespace, p.name, p.resource, classname)
+			log.Infof("'%s/%s' in '%s' lacks runtimeClassName, default is '%s', patching", p.namespace, p.name, p.resource, classname)
 
 			patches = append(patches, Patch{
 				Operation: "add",

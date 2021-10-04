@@ -95,8 +95,8 @@ webhooks:
       caBundle: ${CA_BUNDLE}
     rules:
       - operations: ["CREATE"]
-        apiGroups: [""]
-        apiVersions: ["v1"]
-        resources: ["pods", "deployments", "replicasets", "statefulsets", "daemonsets", "jobs"]
-        scope: "*"
+        apiGroups: ["*"]
+        apiVersions: ["*"]
+        resources: ["pods", "deployments", "replicasets", "statefulsets", "daemonsets", "jobs", "cronjobs"]
+        scope: "Namespaced"
     failurePolicy: Ignore
