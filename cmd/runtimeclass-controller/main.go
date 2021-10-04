@@ -26,7 +26,7 @@ type Controller struct {
 type ReviewResult struct {
 	Allowed bool
 	Message string
-	Patches *[]Patch
+	Patches []Patch
 }
 
 type Patch struct {
@@ -123,7 +123,7 @@ func (c *Controller) Mutate(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	if result.Patches != nil {
+	if len(result.Patches) > 0 {
 		JSONPatch := admission.PatchTypeJSONPatch
 		patches, err := json.Marshal(result.Patches)
 		if err != nil {
@@ -146,7 +146,7 @@ func (c *Controller) Mutate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *Controller) Review(r *admission.AdmissionRequest) (*ReviewResult, error) {
-	var patches *[]Patch
+	var patches []Patch
 
 	resourceName := r.RequestResource.Resource
 
@@ -169,7 +169,7 @@ func (c *Controller) Review(r *admission.AdmissionRequest) (*ReviewResult, error
 			if scopeData.RuntimeClassName == nil {
 				log.Infof("'%s/%s' in '%s' lacks runtimeClassName, default is '%s', patching", scopeData.Namespace, scopeData.Name, resourceName, className)
 
-				*patches = append(*patches, Patch{
+				patches = append(patches, Patch{
 					Op:    "add",
 					Path:  scopeData.PatchPath,
 					Value: className,
