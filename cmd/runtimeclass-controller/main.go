@@ -194,70 +194,84 @@ func (c *Controller) GetPatchScopeData(resource string, object []byte) (*PatchSc
 			return scopeData, err
 		}
 
-		scopeData.RuntimeClassName = pod.Spec.RuntimeClassName
-		scopeData.Namespace = pod.Namespace
-		scopeData.Name = pod.Name
-		scopeData.PatchPath = "/spec/runtimeClassName"
+		scopeData = &PatchScopeData{
+			RuntimeClassName: pod.Spec.RuntimeClassName,
+			Namespace:        pod.Namespace,
+			Name:             pod.Name,
+			PatchPath:        "/spec/runtimeClassName",
+		}
 	case "deployments":
 		var deployment apps.Deployment
 		if err := json.Unmarshal(object, &deployment); err != nil {
 			return scopeData, err
 		}
 
-		scopeData.RuntimeClassName = deployment.Spec.Template.Spec.RuntimeClassName
-		scopeData.Namespace = deployment.Namespace
-		scopeData.Name = deployment.Name
-		scopeData.PatchPath = "/spec/template/spec/runtimeClassName"
+		scopeData = &PatchScopeData{
+			RuntimeClassName: deployment.Spec.Template.Spec.RuntimeClassName,
+			Namespace:        deployment.Namespace,
+			Name:             deployment.Name,
+			PatchPath:        "/spec/template/spec/runtimeClassName",
+		}
 	case "replicasets":
 		var replicaSet apps.ReplicaSet
 		if err := json.Unmarshal(object, &replicaSet); err != nil {
 			return scopeData, err
 		}
 
-		scopeData.RuntimeClassName = replicaSet.Spec.Template.Spec.RuntimeClassName
-		scopeData.Namespace = replicaSet.Namespace
-		scopeData.Name = replicaSet.Name
-		scopeData.PatchPath = "/spec/template/spec/runtimeClassName"
+		scopeData = &PatchScopeData{
+			RuntimeClassName: replicaSet.Spec.Template.Spec.RuntimeClassName,
+			Namespace:        replicaSet.Namespace,
+			Name:             replicaSet.Name,
+			PatchPath:        "/spec/template/spec/runtimeClassName",
+		}
 	case "statefulsets":
 		var statefulSet apps.StatefulSet
 		if err := json.Unmarshal(object, &statefulSet); err != nil {
 			return scopeData, err
 		}
 
-		scopeData.RuntimeClassName = statefulSet.Spec.Template.Spec.RuntimeClassName
-		scopeData.Namespace = statefulSet.Namespace
-		scopeData.Name = statefulSet.Name
-		scopeData.PatchPath = "/spec/template/spec/runtimeClassName"
+		scopeData = &PatchScopeData{
+			RuntimeClassName: statefulSet.Spec.Template.Spec.RuntimeClassName,
+			Namespace:        statefulSet.Namespace,
+			Name:             statefulSet.Name,
+			PatchPath:        "/spec/template/spec/runtimeClassName",
+		}
 	case "daemonsets":
 		var daemonSet apps.DaemonSet
 		if err := json.Unmarshal(object, &daemonSet); err != nil {
 			return scopeData, err
 		}
 
-		scopeData.RuntimeClassName = daemonSet.Spec.Template.Spec.RuntimeClassName
-		scopeData.Namespace = daemonSet.Namespace
-		scopeData.Name = daemonSet.Name
-		scopeData.PatchPath = "/spec/template/spec/runtimeClassName"
+		scopeData = &PatchScopeData{
+			RuntimeClassName: daemonSet.Spec.Template.Spec.RuntimeClassName,
+			Namespace:        daemonSet.Namespace,
+			Name:             daemonSet.Name,
+			PatchPath:        "/spec/template/spec/runtimeClassName",
+		}
 	case "jobs":
 		var job batch.Job
 		if err := json.Unmarshal(object, &job); err != nil {
 			return scopeData, err
 		}
 
-		scopeData.RuntimeClassName = job.Spec.Template.Spec.RuntimeClassName
-		scopeData.Namespace = job.Namespace
-		scopeData.Name = job.Name
-		scopeData.PatchPath = "/spec/template/spec/runtimeClassName"
+		scopeData = &PatchScopeData{
+			RuntimeClassName: job.Spec.Template.Spec.RuntimeClassName,
+			Namespace:        job.Namespace,
+			Name:             job.Name,
+			PatchPath:        "/spec/template/spec/runtimeClassName",
+		}
 	case "cronjobs":
 		var cronJob batch.CronJob
 		if err := json.Unmarshal(object, &cronJob); err != nil {
 			return scopeData, err
 		}
 
-		scopeData.RuntimeClassName = cronJob.Spec.JobTemplate.Spec.Template.Spec.RuntimeClassName
-		scopeData.Namespace = cronJob.Namespace
-		scopeData.Name = cronJob.Name
-		scopeData.PatchPath = "/jobTemplate/spec/template/spec/runtimeClassName"
+		scopeData = &PatchScopeData{
+			RuntimeClassName: cronJob.Spec.JobTemplate.Spec.Template.Spec.RuntimeClassName,
+			Namespace:        cronJob.Namespace,
+			Name:             cronJob.Name,
+			PatchPath:        "/jobTemplate/spec/template/spec/runtimeClassName",
+		}
 	}
 
 	return scopeData, nil
