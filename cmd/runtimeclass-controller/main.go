@@ -18,9 +18,9 @@ import (
 	"net/http"
 )
 
-type controller struct {
-	deserializer runtime.Decoder
-	client       *kubernetes.Clientset
+type Controller struct {
+	Deserializer runtime.Decoder
+	Client       *kubernetes.Clientset
 }
 
 type PatchResult struct {
@@ -36,6 +36,13 @@ type Patch struct {
 	Value interface{} `json:"value,omitempty"`
 }
 
+type PatchScopeData struct {
+	RuntimeClassName *string
+	Namespace        string
+	Name             string
+	PatchPath        string
+}
+
 func main() {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -47,9 +54,9 @@ func main() {
 		panic(err.Error())
 	}
 
-	c := controller{
-		deserializer: serializer.NewCodecFactory(runtime.NewScheme()).UniversalDeserializer(),
-		client:       clientset,
+	c := Controller{
+		Deserializer: serializer.NewCodecFactory(runtime.NewScheme()).UniversalDeserializer(),
+		Client:       clientset,
 	}
 
 	mux := http.NewServeMux()
@@ -65,7 +72,7 @@ func main() {
 	}
 }
 
-func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
+func (c *Controller) Mutate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method != http.MethodPost {
@@ -88,7 +95,7 @@ func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var review admission.AdmissionReview
-	if _, _, err := c.deserializer.Decode(body, nil, &review); err != nil {
+	if _, _, err := c.Deserializer.Decode(body, nil, &review); err != nil {
 		http.Error(w, fmt.Sprintf("failed to decode request: %v", err), http.StatusBadRequest)
 		log.Error("invalid review")
 		return
@@ -138,124 +145,36 @@ func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(responseJson)
 }
 
-func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, error) {
+func (c *Controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, error) {
 	var patches *[]Patch
-	var runtimeClassName *string
-	var resource string
-	var namespace string
-	var name string
-	var path string
 
-	resource = r.RequestResource.Resource
+	resourceName := r.RequestResource.Resource
 
-	switch resource {
-	case "pods":
-		var pod core.Pod
-		if err := json.Unmarshal(r.Object.Raw, &pod); err != nil {
-			return &PatchResult{
-				Message: err.Error(),
-			}, err
-		}
-
-		runtimeClassName = pod.Spec.RuntimeClassName
-		namespace = pod.Namespace
-		name = pod.Name
-		path = "/spec/runtimeClassName"
-	case "deployments":
-		var deployment apps.Deployment
-		if err := json.Unmarshal(r.Object.Raw, &deployment); err != nil {
-			return &PatchResult{
-				Message: err.Error(),
-			}, err
-		}
-
-		runtimeClassName = deployment.Spec.Template.Spec.RuntimeClassName
-		namespace = deployment.Namespace
-		name = deployment.Name
-		path = "/spec/template/spec/runtimeClassName"
-	case "replicasets":
-		var replicaSet apps.ReplicaSet
-		if err := json.Unmarshal(r.Object.Raw, &replicaSet); err != nil {
-			return &PatchResult{
-				Message: err.Error(),
-			}, err
-		}
-
-		runtimeClassName = replicaSet.Spec.Template.Spec.RuntimeClassName
-		namespace = replicaSet.Namespace
-		name = replicaSet.Name
-		path = "/spec/template/spec/runtimeClassName"
-	case "statefulsets":
-		var statefulSet apps.StatefulSet
-		if err := json.Unmarshal(r.Object.Raw, &statefulSet); err != nil {
-			return &PatchResult{
-				Message: err.Error(),
-			}, err
-		}
-
-		runtimeClassName = statefulSet.Spec.Template.Spec.RuntimeClassName
-		namespace = statefulSet.Namespace
-		name = statefulSet.Name
-		path = "/spec/template/spec/runtimeClassName"
-	case "daemonsets":
-		var daemonSet apps.DaemonSet
-		if err := json.Unmarshal(r.Object.Raw, &daemonSet); err != nil {
-			return &PatchResult{
-				Message: err.Error(),
-			}, err
-		}
-
-		runtimeClassName = daemonSet.Spec.Template.Spec.RuntimeClassName
-		namespace = daemonSet.Namespace
-		name = daemonSet.Name
-		path = "/spec/template/spec/runtimeClassName"
-	case "jobs":
-		var job batch.Job
-		if err := json.Unmarshal(r.Object.Raw, &job); err != nil {
-			return &PatchResult{
-				Message: err.Error(),
-			}, err
-		}
-
-		runtimeClassName = job.Spec.Template.Spec.RuntimeClassName
-		namespace = job.Namespace
-		name = job.Name
-		path = "/spec/template/spec/runtimeClassName"
-	case "cronjobs":
-		var cronJob batch.CronJob
-		if err := json.Unmarshal(r.Object.Raw, &cronJob); err != nil {
-			return &PatchResult{
-				Message: err.Error(),
-			}, err
-		}
-
-		runtimeClassName = cronJob.Spec.JobTemplate.Spec.Template.Spec.RuntimeClassName
-		namespace = cronJob.Namespace
-		name = cronJob.Name
-		path = "/jobTemplate/spec/template/spec/runtimeClassName"
-	default:
-		return &PatchResult{
-			Allowed: true,
-		}, nil
-	}
-
-	namespaceObj, err := c.client.CoreV1().Namespaces().Get(context.TODO(), namespace, meta.GetOptions{})
+	scopeData, err := c.GetPatchScopeData(resourceName, r.Object.Raw)
 	if err != nil {
-		// Currently, silently fail.
 		return &PatchResult{
-			Allowed: true,
-		}, nil
+			Message: err.Error(),
+		}, err
 	}
 
-	if classname, ok := namespaceObj.Labels["runtimeclassname-default"]; ok {
-		if runtimeClassName == nil {
-			log.Infof("'%s/%s' in '%s' lacks runtimeClassName, default is '%s', patching", namespace, name, resource, classname)
+	if scopeData != nil {
+		namespaceObj, err := c.Client.CoreV1().Namespaces().Get(context.TODO(), scopeData.Namespace, meta.GetOptions{})
+		if err != nil {
+			return &PatchResult{
+				Message: err.Error(),
+			}, err
+		}
 
-			*patches = append(*patches, Patch{
-				Op:    "add",
-				Path:  path,
-				Value: classname,
-			})
+		if className, ok := namespaceObj.Labels["runtimeclassname-default"]; ok {
+			if scopeData.RuntimeClassName == nil {
+				log.Infof("'%s/%s' in '%s' lacks runtimeClassName, default is '%s', patching", scopeData.Namespace, scopeData.Name, resourceName, className)
+
+				*patches = append(*patches, Patch{
+					Op:    "add",
+					Path:  scopeData.PatchPath,
+					Value: className,
+				})
+			}
 		}
 	}
 
@@ -265,7 +184,86 @@ func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 	}, nil
 }
 
-func (c *controller) health(w http.ResponseWriter, _ *http.Request) {
+func (c *Controller) GetPatchScopeData(resource string, object []byte) (*PatchScopeData, error) {
+	var scopeData *PatchScopeData
+
+	switch resource {
+	case "pods":
+		var pod core.Pod
+		if err := json.Unmarshal(object, &pod); err != nil {
+			return scopeData, err
+		}
+
+		scopeData.RuntimeClassName = pod.Spec.RuntimeClassName
+		scopeData.Namespace = pod.Namespace
+		scopeData.Name = pod.Name
+		scopeData.PatchPath = "/spec/runtimeClassName"
+	case "deployments":
+		var deployment apps.Deployment
+		if err := json.Unmarshal(object, &deployment); err != nil {
+			return scopeData, err
+		}
+
+		scopeData.RuntimeClassName = deployment.Spec.Template.Spec.RuntimeClassName
+		scopeData.Namespace = deployment.Namespace
+		scopeData.Name = deployment.Name
+		scopeData.PatchPath = "/spec/template/spec/runtimeClassName"
+	case "replicasets":
+		var replicaSet apps.ReplicaSet
+		if err := json.Unmarshal(object, &replicaSet); err != nil {
+			return scopeData, err
+		}
+
+		scopeData.RuntimeClassName = replicaSet.Spec.Template.Spec.RuntimeClassName
+		scopeData.Namespace = replicaSet.Namespace
+		scopeData.Name = replicaSet.Name
+		scopeData.PatchPath = "/spec/template/spec/runtimeClassName"
+	case "statefulsets":
+		var statefulSet apps.StatefulSet
+		if err := json.Unmarshal(object, &statefulSet); err != nil {
+			return scopeData, err
+		}
+
+		scopeData.RuntimeClassName = statefulSet.Spec.Template.Spec.RuntimeClassName
+		scopeData.Namespace = statefulSet.Namespace
+		scopeData.Name = statefulSet.Name
+		scopeData.PatchPath = "/spec/template/spec/runtimeClassName"
+	case "daemonsets":
+		var daemonSet apps.DaemonSet
+		if err := json.Unmarshal(object, &daemonSet); err != nil {
+			return scopeData, err
+		}
+
+		scopeData.RuntimeClassName = daemonSet.Spec.Template.Spec.RuntimeClassName
+		scopeData.Namespace = daemonSet.Namespace
+		scopeData.Name = daemonSet.Name
+		scopeData.PatchPath = "/spec/template/spec/runtimeClassName"
+	case "jobs":
+		var job batch.Job
+		if err := json.Unmarshal(object, &job); err != nil {
+			return scopeData, err
+		}
+
+		scopeData.RuntimeClassName = job.Spec.Template.Spec.RuntimeClassName
+		scopeData.Namespace = job.Namespace
+		scopeData.Name = job.Name
+		scopeData.PatchPath = "/spec/template/spec/runtimeClassName"
+	case "cronjobs":
+		var cronJob batch.CronJob
+		if err := json.Unmarshal(object, &cronJob); err != nil {
+			return scopeData, err
+		}
+
+		scopeData.RuntimeClassName = cronJob.Spec.JobTemplate.Spec.Template.Spec.RuntimeClassName
+		scopeData.Namespace = cronJob.Namespace
+		scopeData.Name = cronJob.Name
+		scopeData.PatchPath = "/jobTemplate/spec/template/spec/runtimeClassName"
+	}
+
+	return scopeData, nil
+}
+
+func (c *Controller) health(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
 }
