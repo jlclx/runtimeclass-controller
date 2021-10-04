@@ -166,7 +166,7 @@ func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 			name:             pod.Name,
 			path:             "/spec/runtimeClassName",
 		}
-	case "deployments":
+	case "deployment":
 		var deployment apps.Deployment
 		if err := json.Unmarshal(r.Object.Raw, &deployment); err != nil {
 			return &PatchResult{
@@ -181,7 +181,7 @@ func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 			name:             deployment.Name,
 			path:             "/spec/template/spec/runtimeClassName",
 		}
-	case "replicasets":
+	case "replicaset":
 		var replicaSet apps.ReplicaSet
 		if err := json.Unmarshal(r.Object.Raw, &replicaSet); err != nil {
 			return &PatchResult{
@@ -196,7 +196,7 @@ func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 			name:             replicaSet.Name,
 			path:             "/spec/template/spec/runtimeClassName",
 		}
-	case "statefulsets":
+	case "statefulset":
 		var statefulSet apps.StatefulSet
 		if err := json.Unmarshal(r.Object.Raw, &statefulSet); err != nil {
 			return &PatchResult{
@@ -211,7 +211,7 @@ func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 			name:             statefulSet.Name,
 			path:             "/spec/template/spec/runtimeClassName",
 		}
-	case "daemonsets":
+	case "daemonset":
 		var daemonSet apps.DaemonSet
 		if err := json.Unmarshal(r.Object.Raw, &daemonSet); err != nil {
 			return &PatchResult{
@@ -226,7 +226,7 @@ func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 			name:             daemonSet.Name,
 			path:             "/spec/template/spec/runtimeClassName",
 		}
-	case "jobs":
+	case "job":
 		var job batch.Job
 		if err := json.Unmarshal(r.Object.Raw, &job); err != nil {
 			return &PatchResult{
