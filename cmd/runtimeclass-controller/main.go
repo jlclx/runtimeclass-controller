@@ -23,7 +23,7 @@ type Controller struct {
 	Client       *kubernetes.Clientset
 }
 
-type PatchResult struct {
+type ReviewResult struct {
 	Allowed bool
 	Message string
 	Patches *[]Patch
@@ -107,7 +107,7 @@ func (c *Controller) Mutate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := c.GetPatches(review.Request)
+	result, err := c.Review(review.Request)
 	if err != nil {
 		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -145,14 +145,14 @@ func (c *Controller) Mutate(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(responseJson)
 }
 
-func (c *Controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, error) {
+func (c *Controller) Review(r *admission.AdmissionRequest) (*ReviewResult, error) {
 	var patches *[]Patch
 
 	resourceName := r.RequestResource.Resource
 
 	scopeData, err := c.GetPatchScopeData(resourceName, r.Object.Raw)
 	if err != nil {
-		return &PatchResult{
+		return &ReviewResult{
 			Message: err.Error(),
 		}, err
 	}
@@ -160,7 +160,7 @@ func (c *Controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 	if scopeData != nil {
 		namespaceObj, err := c.Client.CoreV1().Namespaces().Get(context.TODO(), scopeData.Namespace, meta.GetOptions{})
 		if err != nil {
-			return &PatchResult{
+			return &ReviewResult{
 				Message: err.Error(),
 			}, err
 		}
@@ -178,7 +178,7 @@ func (c *Controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 		}
 	}
 
-	return &PatchResult{
+	return &ReviewResult{
 		Allowed: true,
 		Patches: patches,
 	}, nil
