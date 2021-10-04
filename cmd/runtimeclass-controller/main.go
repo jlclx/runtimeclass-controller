@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	admission "k8s.io/api/admission/v1"
+	apps "k8s.io/api/apps/v1"
+	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,7 +39,7 @@ type Patch struct {
 
 type PatchIntent struct {
 	runtimeClassName *string
-	group            string
+	resource         string
 	namespace        string
 	name             string
 	path             string
@@ -159,10 +161,85 @@ func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 
 		p = &PatchIntent{
 			runtimeClassName: pod.Spec.RuntimeClassName,
-			group:            r.Resource.Group,
+			resource:         r.RequestResource.Resource,
 			namespace:        pod.Namespace,
 			name:             pod.Name,
 			path:             "/spec/runtimeClassName",
+		}
+	case "deployments":
+		var deployment apps.Deployment
+		if err := json.Unmarshal(r.Object.Raw, &deployment); err != nil {
+			return &PatchResult{
+				Message: err.Error(),
+			}, err
+		}
+
+		p = &PatchIntent{
+			runtimeClassName: deployment.Spec.Template.Spec.RuntimeClassName,
+			resource:         r.RequestResource.Resource,
+			namespace:        deployment.Namespace,
+			name:             deployment.Name,
+			path:             "/spec/template/spec/runtimeClassName",
+		}
+	case "replicasets":
+		var replicaSet apps.ReplicaSet
+		if err := json.Unmarshal(r.Object.Raw, &replicaSet); err != nil {
+			return &PatchResult{
+				Message: err.Error(),
+			}, err
+		}
+
+		p = &PatchIntent{
+			runtimeClassName: replicaSet.Spec.Template.Spec.RuntimeClassName,
+			resource:         r.RequestResource.Resource,
+			namespace:        replicaSet.Namespace,
+			name:             replicaSet.Name,
+			path:             "/spec/template/spec/runtimeClassName",
+		}
+	case "statefulsets":
+		var statefulSet apps.StatefulSet
+		if err := json.Unmarshal(r.Object.Raw, &statefulSet); err != nil {
+			return &PatchResult{
+				Message: err.Error(),
+			}, err
+		}
+
+		p = &PatchIntent{
+			runtimeClassName: statefulSet.Spec.Template.Spec.RuntimeClassName,
+			resource:         r.RequestResource.Resource,
+			namespace:        statefulSet.Namespace,
+			name:             statefulSet.Name,
+			path:             "/spec/template/spec/runtimeClassName",
+		}
+	case "daemonsets":
+		var daemonSet apps.DaemonSet
+		if err := json.Unmarshal(r.Object.Raw, &daemonSet); err != nil {
+			return &PatchResult{
+				Message: err.Error(),
+			}, err
+		}
+
+		p = &PatchIntent{
+			runtimeClassName: daemonSet.Spec.Template.Spec.RuntimeClassName,
+			resource:         r.RequestResource.Resource,
+			namespace:        daemonSet.Namespace,
+			name:             daemonSet.Name,
+			path:             "/spec/template/spec/runtimeClassName",
+		}
+	case "jobs":
+		var job batch.Job
+		if err := json.Unmarshal(r.Object.Raw, &job); err != nil {
+			return &PatchResult{
+				Message: err.Error(),
+			}, err
+		}
+
+		p = &PatchIntent{
+			runtimeClassName: job.Spec.Template.Spec.RuntimeClassName,
+			resource:         r.RequestResource.Resource,
+			namespace:        job.Namespace,
+			name:             job.Name,
+			path:             "/spec/template/spec/runtimeClassName",
 		}
 	}
 
@@ -192,7 +269,7 @@ func (c *controller) CreatePatches(p *PatchIntent) (*[]Patch, error) {
 
 	if classname, ok := namespaceObj.Labels["runtimeclassname-default"]; ok {
 		if p.runtimeClassName == nil {
-			log.Infof("%s/%s in %s lacks runtimeClassName, default is %s", p.namespace, p.group, p.name, classname)
+			log.Infof("%s/%s in %s lacks runtimeClassName, default is %s", p.namespace, p.name, p.resource, classname)
 
 			patches = append(patches, Patch{
 				Operation: "add",
