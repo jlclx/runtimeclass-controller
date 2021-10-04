@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	admission "k8s.io/api/admission/v1"
@@ -27,22 +26,14 @@ type controller struct {
 type PatchResult struct {
 	Allowed bool
 	Message string
-	Patches []Patch
+	Patches *[]Patch
 }
 
 type Patch struct {
-	Operation string      `json:"op"`
-	Path      string      `json:"path"`
-	From      string      `json:"from"`
-	Value     interface{} `json:"value,omitempty"`
-}
-
-type PatchIntent struct {
-	runtimeClassName *string
-	resource         string
-	namespace        string
-	name             string
-	path             string
+	Op    string      `json:"op"`
+	Path  string      `json:"path"`
+	From  string      `json:"from"`
+	Value interface{} `json:"value,omitempty"`
 }
 
 func main() {
@@ -104,8 +95,8 @@ func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if review.Request == nil {
-		http.Error(w, "bad admission review", http.StatusBadRequest)
-		log.Error("bad admission review")
+		http.Error(w, "bad admission review, no request", http.StatusBadRequest)
+		log.Error("bad admission review, no request")
 		return
 	}
 
@@ -125,7 +116,7 @@ func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	if len(result.Patches) > 0 {
+	if result.Patches != nil {
 		JSONPatch := admission.PatchTypeJSONPatch
 		patches, err := json.Marshal(result.Patches)
 		if err != nil {
@@ -148,8 +139,16 @@ func (c *controller) Mutate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, error) {
-	var p *PatchIntent
-	switch r.RequestResource.Resource {
+	var patches *[]Patch
+	var runtimeClassName *string
+	var resource string
+	var namespace string
+	var name string
+	var path string
+
+	resource = r.RequestResource.Resource
+
+	switch resource {
 	case "pods":
 		var pod core.Pod
 		if err := json.Unmarshal(r.Object.Raw, &pod); err != nil {
@@ -158,13 +157,10 @@ func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 			}, err
 		}
 
-		p = &PatchIntent{
-			runtimeClassName: pod.Spec.RuntimeClassName,
-			resource:         r.RequestResource.Resource,
-			namespace:        pod.Namespace,
-			name:             pod.Name,
-			path:             "/spec/runtimeClassName",
-		}
+		runtimeClassName = pod.Spec.RuntimeClassName
+		namespace = pod.Namespace
+		name = pod.Name
+		path = "/spec/runtimeClassName"
 	case "deployments":
 		var deployment apps.Deployment
 		if err := json.Unmarshal(r.Object.Raw, &deployment); err != nil {
@@ -173,13 +169,10 @@ func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 			}, err
 		}
 
-		p = &PatchIntent{
-			runtimeClassName: deployment.Spec.Template.Spec.RuntimeClassName,
-			resource:         r.RequestResource.Resource,
-			namespace:        deployment.Namespace,
-			name:             deployment.Name,
-			path:             "/spec/template/spec/runtimeClassName",
-		}
+		runtimeClassName = deployment.Spec.Template.Spec.RuntimeClassName
+		namespace = deployment.Namespace
+		name = deployment.Name
+		path = "/spec/template/spec/runtimeClassName"
 	case "replicasets":
 		var replicaSet apps.ReplicaSet
 		if err := json.Unmarshal(r.Object.Raw, &replicaSet); err != nil {
@@ -188,13 +181,10 @@ func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 			}, err
 		}
 
-		p = &PatchIntent{
-			runtimeClassName: replicaSet.Spec.Template.Spec.RuntimeClassName,
-			resource:         r.RequestResource.Resource,
-			namespace:        replicaSet.Namespace,
-			name:             replicaSet.Name,
-			path:             "/spec/template/spec/runtimeClassName",
-		}
+		runtimeClassName = replicaSet.Spec.Template.Spec.RuntimeClassName
+		namespace = replicaSet.Namespace
+		name = replicaSet.Name
+		path = "/spec/template/spec/runtimeClassName"
 	case "statefulsets":
 		var statefulSet apps.StatefulSet
 		if err := json.Unmarshal(r.Object.Raw, &statefulSet); err != nil {
@@ -203,13 +193,10 @@ func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 			}, err
 		}
 
-		p = &PatchIntent{
-			runtimeClassName: statefulSet.Spec.Template.Spec.RuntimeClassName,
-			resource:         r.RequestResource.Resource,
-			namespace:        statefulSet.Namespace,
-			name:             statefulSet.Name,
-			path:             "/spec/template/spec/runtimeClassName",
-		}
+		runtimeClassName = statefulSet.Spec.Template.Spec.RuntimeClassName
+		namespace = statefulSet.Namespace
+		name = statefulSet.Name
+		path = "/spec/template/spec/runtimeClassName"
 	case "daemonsets":
 		var daemonSet apps.DaemonSet
 		if err := json.Unmarshal(r.Object.Raw, &daemonSet); err != nil {
@@ -218,13 +205,10 @@ func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 			}, err
 		}
 
-		p = &PatchIntent{
-			runtimeClassName: daemonSet.Spec.Template.Spec.RuntimeClassName,
-			resource:         r.RequestResource.Resource,
-			namespace:        daemonSet.Namespace,
-			name:             daemonSet.Name,
-			path:             "/spec/template/spec/runtimeClassName",
-		}
+		runtimeClassName = daemonSet.Spec.Template.Spec.RuntimeClassName
+		namespace = daemonSet.Namespace
+		name = daemonSet.Name
+		path = "/spec/template/spec/runtimeClassName"
 	case "jobs":
 		var job batch.Job
 		if err := json.Unmarshal(r.Object.Raw, &job); err != nil {
@@ -233,13 +217,10 @@ func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 			}, err
 		}
 
-		p = &PatchIntent{
-			runtimeClassName: job.Spec.Template.Spec.RuntimeClassName,
-			resource:         r.RequestResource.Resource,
-			namespace:        job.Namespace,
-			name:             job.Name,
-			path:             "/spec/template/spec/runtimeClassName",
-		}
+		runtimeClassName = job.Spec.Template.Spec.RuntimeClassName
+		namespace = job.Namespace
+		name = job.Name
+		path = "/spec/template/spec/runtimeClassName"
 	case "cronjobs":
 		var cronJob batch.CronJob
 		if err := json.Unmarshal(r.Object.Raw, &cronJob); err != nil {
@@ -248,54 +229,40 @@ func (c *controller) GetPatches(r *admission.AdmissionRequest) (*PatchResult, er
 			}, err
 		}
 
-		p = &PatchIntent{
-			runtimeClassName: cronJob.Spec.JobTemplate.Spec.Template.Spec.RuntimeClassName,
-			resource:         r.RequestResource.Resource,
-			namespace:        cronJob.Namespace,
-			name:             cronJob.Name,
-			path:             "/jobTemplate/spec/template/spec/runtimeClassName",
-		}
+		runtimeClassName = cronJob.Spec.JobTemplate.Spec.Template.Spec.RuntimeClassName
+		namespace = cronJob.Namespace
+		name = cronJob.Name
+		path = "/jobTemplate/spec/template/spec/runtimeClassName"
+	default:
+		return &PatchResult{
+			Allowed: true,
+		}, nil
 	}
 
-	if p != nil {
-		patches, err := c.CreatePatches(p)
-		if err == nil {
-			return &PatchResult{
-				Allowed: true,
-				Patches: *patches,
-			}, nil
+	namespaceObj, err := c.client.CoreV1().Namespaces().Get(context.TODO(), namespace, meta.GetOptions{})
+	if err != nil {
+		// Currently, silently fail.
+		return &PatchResult{
+			Allowed: true,
+		}, nil
+	}
+
+	if classname, ok := namespaceObj.Labels["runtimeclassname-default"]; ok {
+		if runtimeClassName == nil {
+			log.Infof("'%s/%s' in '%s' lacks runtimeClassName, default is '%s', patching", namespace, name, resource, classname)
+
+			*patches = append(*patches, Patch{
+				Op:    "add",
+				Path:  path,
+				Value: classname,
+			})
 		}
 	}
 
 	return &PatchResult{
 		Allowed: true,
+		Patches: patches,
 	}, nil
-}
-
-func (c *controller) CreatePatches(p *PatchIntent) (*[]Patch, error) {
-	var patches []Patch
-
-	namespaceObj, err := c.client.CoreV1().Namespaces().Get(context.TODO(), p.namespace, meta.GetOptions{})
-	if err != nil {
-		// Currently, silently fail.
-		return &patches, err
-	}
-
-	if classname, ok := namespaceObj.Labels["runtimeclassname-default"]; ok {
-		if p.runtimeClassName == nil {
-			log.Infof("'%s/%s' in '%s' lacks runtimeClassName, default is '%s', patching", p.namespace, p.name, p.resource, classname)
-
-			patches = append(patches, Patch{
-				Operation: "add",
-				Path:      p.path,
-				Value:     classname,
-			})
-
-			return &patches, nil
-		}
-	}
-
-	return &patches, errors.New("no patch applied")
 }
 
 func (c *controller) health(w http.ResponseWriter, _ *http.Request) {
