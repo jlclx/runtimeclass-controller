@@ -4,6 +4,8 @@ A very basic admission controller that adds a runtimeClassName to an object's sp
 ### Example usage:
 
 ```console
+jlclx@sandbox26:~/git$ kubectl create namespace runtimeclass-controller
+namespace/runtimeclass-controller created
 jlclx@sandbox26:~/git$ sh deployments/runtimeclass-controller.sh | kubectl apply -f -
 secret/runtimeclass-controller-certs created
 serviceaccount/runtimeclass-controller created
