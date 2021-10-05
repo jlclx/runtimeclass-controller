@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	admission "k8s.io/api/admission/v1"
-	apps "k8s.io/api/apps/v1"
-	batch "k8s.io/api/batch/v1"
-	core "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	admissionv1 "k8s.io/api/admission/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
@@ -94,7 +94,7 @@ func (c *Controller) Mutate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var review admission.AdmissionReview
+	var review admissionv1.AdmissionReview
 	if _, _, err := c.Deserializer.Decode(body, nil, &review); err != nil {
 		http.Error(w, fmt.Sprintf("failed to decode request: %v", err), http.StatusBadRequest)
 		log.Error("invalid review")
@@ -114,17 +114,17 @@ func (c *Controller) Mutate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := admission.AdmissionReview{
-		TypeMeta: meta.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
-		Response: &admission.AdmissionResponse{
+	response := admissionv1.AdmissionReview{
+		TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
+		Response: &admissionv1.AdmissionResponse{
 			UID:     review.Request.UID,
 			Allowed: result.Allowed,
-			Result:  &meta.Status{Message: result.Message},
+			Result:  &metav1.Status{Message: result.Message},
 		},
 	}
 
 	if len(result.Patches) > 0 {
-		JSONPatch := admission.PatchTypeJSONPatch
+		JSONPatch := admissionv1.PatchTypeJSONPatch
 		patches, err := json.Marshal(result.Patches)
 		if err != nil {
 			log.Error(err)
@@ -145,7 +145,7 @@ func (c *Controller) Mutate(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(responseJson)
 }
 
-func (c *Controller) Review(r *admission.AdmissionRequest) (*ReviewResult, error) {
+func (c *Controller) Review(r *admissionv1.AdmissionRequest) (*ReviewResult, error) {
 	var patches []Patch
 
 	resourceName := r.RequestResource.Resource
@@ -158,7 +158,7 @@ func (c *Controller) Review(r *admission.AdmissionRequest) (*ReviewResult, error
 	}
 
 	if scopeData != nil {
-		namespaceObj, err := c.Client.CoreV1().Namespaces().Get(context.TODO(), scopeData.Namespace, meta.GetOptions{})
+		namespaceObj, err := c.Client.CoreV1().Namespaces().Get(context.TODO(), scopeData.Namespace, metav1.GetOptions{})
 		if err != nil {
 			return &ReviewResult{
 				Message: err.Error(),
@@ -189,7 +189,7 @@ func (c *Controller) GetPatchScopeData(resource string, object []byte) (*PatchSc
 
 	switch resource {
 	case "pods":
-		var pod core.Pod
+		var pod corev1.Pod
 		if err := json.Unmarshal(object, &pod); err != nil {
 			return scopeData, err
 		}
@@ -201,7 +201,7 @@ func (c *Controller) GetPatchScopeData(resource string, object []byte) (*PatchSc
 			PatchPath:        "/spec/runtimeClassName",
 		}
 	case "deployments":
-		var deployment apps.Deployment
+		var deployment appsv1.Deployment
 		if err := json.Unmarshal(object, &deployment); err != nil {
 			return scopeData, err
 		}
@@ -213,7 +213,7 @@ func (c *Controller) GetPatchScopeData(resource string, object []byte) (*PatchSc
 			PatchPath:        "/spec/template/spec/runtimeClassName",
 		}
 	case "replicasets":
-		var replicaSet apps.ReplicaSet
+		var replicaSet appsv1.ReplicaSet
 		if err := json.Unmarshal(object, &replicaSet); err != nil {
 			return scopeData, err
 		}
@@ -225,7 +225,7 @@ func (c *Controller) GetPatchScopeData(resource string, object []byte) (*PatchSc
 			PatchPath:        "/spec/template/spec/runtimeClassName",
 		}
 	case "statefulsets":
-		var statefulSet apps.StatefulSet
+		var statefulSet appsv1.StatefulSet
 		if err := json.Unmarshal(object, &statefulSet); err != nil {
 			return scopeData, err
 		}
@@ -237,7 +237,7 @@ func (c *Controller) GetPatchScopeData(resource string, object []byte) (*PatchSc
 			PatchPath:        "/spec/template/spec/runtimeClassName",
 		}
 	case "daemonsets":
-		var daemonSet apps.DaemonSet
+		var daemonSet appsv1.DaemonSet
 		if err := json.Unmarshal(object, &daemonSet); err != nil {
 			return scopeData, err
 		}
@@ -249,7 +249,7 @@ func (c *Controller) GetPatchScopeData(resource string, object []byte) (*PatchSc
 			PatchPath:        "/spec/template/spec/runtimeClassName",
 		}
 	case "jobs":
-		var job batch.Job
+		var job batchv1.Job
 		if err := json.Unmarshal(object, &job); err != nil {
 			return scopeData, err
 		}
@@ -261,7 +261,7 @@ func (c *Controller) GetPatchScopeData(resource string, object []byte) (*PatchSc
 			PatchPath:        "/spec/template/spec/runtimeClassName",
 		}
 	case "cronjobs":
-		var cronJob batch.CronJob
+		var cronJob batchv1.CronJob
 		if err := json.Unmarshal(object, &cronJob); err != nil {
 			return scopeData, err
 		}
