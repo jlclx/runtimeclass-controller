@@ -37,3 +37,7 @@ pod/busybox created
 jlclx@sandbox26:~/git$ kubectl get --namespace example pod busybox -o jsonpath="{.spec.runtimeClassName}" ; echo
 gvisor
 ```
+
+### Motivation:
+Not every helm chart, executor, operator, etc supports runtimeClassName on object specs yet.
+This allows me to work around that for testing different runtimes.
