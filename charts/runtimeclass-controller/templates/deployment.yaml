@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "runtimeclass-controller.fullname" . }}-deployment
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "runtimeclass-controller.fullname" . }}-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ template "runtimeclass-controller.fullname" . }}-deployment
+  template:
+    metadata:
+      labels:
+        app: {{ template "runtimeclass-controller.fullname" . }}-deployment
+    spec:
+      serviceAccountName: {{ template "runtimeclass-controller.fullname" . }}-serviceaccount
+      containers:
+        - name: controller
+          image: {{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag | default .Chart.AppVersion }}
+          imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8443
+              scheme: HTTPS
+          ports:
+            - containerPort: 8443
+          env:
+            - name: RUNTIME_CLASSNAME_KEY
+              value: {{ .Values.controller.runtimeClassNameKey }}
+          volumeMounts:
+            - name: webhook-certs
+              mountPath: /certs
+              readOnly: true
+      volumes:
+        - name: webhook-certs
+          secret:
+            secretName: {{ template "runtimeclass-controller.fullname" . }}-certs

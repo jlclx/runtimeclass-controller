@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"k8s.io/client-go/rest"
 	log "k8s.io/klog/v2"
 	"net/http"
+	"os"
 )
 
 type Controller struct {
@@ -65,11 +67,30 @@ func main() {
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":8443"),
 		Handler: mux,
+		TLSConfig: &tls.Config{
+			GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+				// TODO: Functionally this reloads certificate on every request, add a smarter loading mechanism later.
+				// Active reloading is currently required to avoid becoming out-of-sync with the secret on upgrade.
+				cert, err := tls.LoadX509KeyPair("/certs/tls.crt", "/certs/tls.key")
+				if err != nil {
+					return nil, err
+				}
+				return &cert, nil
+			},
+		},
 	}
 
-	if err := server.ListenAndServeTLS("/certs/tls.crt", "/certs/tls.key"); err != nil {
+	if err := server.ListenAndServeTLS("", ""); err != nil {
 		log.Errorf("failed to listen and serve: %v", err)
 	}
+}
+
+func getKey() string {
+	key := os.Getenv("RUNTIME_CLASSNAME_KEY")
+	if key == "" {
+		return "runtimeclassname-default"
+	}
+	return key
 }
 
 func (c *Controller) Mutate(w http.ResponseWriter, r *http.Request) {
@@ -165,7 +186,7 @@ func (c *Controller) Review(r *admissionv1.AdmissionRequest) (*ReviewResult, err
 			}, err
 		}
 
-		if className, ok := namespaceObj.Labels["runtimeclassname-default"]; ok {
+		if className, ok := namespaceObj.Labels[getKey()]; ok {
 			if scopeData.RuntimeClassName == nil {
 				log.Infof("'%s/%s' in '%s' lacks runtimeClassName, default is '%s', patching", scopeData.Namespace, scopeData.Name, resourceName, className)
 
