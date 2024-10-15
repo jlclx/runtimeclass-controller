@@ -1,0 +1,17 @@
+apiVersion: v1
+entries:
+  runtimeclass-controller:
+  - apiVersion: v2
+    appVersion: v0.0.1
+    created: "2024-10-15T21:53:04.055911922Z"
+    description: An ingress controller for automatically applying a runtimeclass to
+      a namespace.
+    digest: ee7bc6a09848e57aaf16561b5e94da002a6d80d4cd0c6b8250f03d00f89dca67
+    name: runtimeclass-controller
+    sources:
+    - https://github.com/jlclx/runtimeclass-controller
+    type: application
+    urls:
+    - https://github.com/jlclx/runtimeclass-controller/releases/download/runtimeclass-controller-v0.0.1/runtimeclass-controller-v0.0.1.tgz
+    version: v0.0.1
+generated: "2024-10-15T21:53:04.055923834Z"
