@@ -3,6 +3,6 @@ type: application
 name: runtimeclass-controller
 version: v0.0.1
 appVersion: v0.0.1
-description: An ingress controller for automatically applying a runtimeclass to a namespace.
+description: An admission controller for automatically applying a runtimeClassName to pods in a namespace.
 sources:
   - https://github.com/jlclx/runtimeclass-controller
