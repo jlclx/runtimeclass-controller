@@ -2,7 +2,16 @@
 A very basic admission controller that adds a runtimeClassName to an object's spec depending on namespace label.
 
 ### Example usage:
+```console
+jlclx@sandbox84:~$ helm repo add runtimeclass-controller https://jlclx.github.io/runtimeclass-controller
+jlclx@sandbox84:~$ helm install --namespace runtimeclass-controller runtimeclass-controller runtimeclass-controller/runtimeclass-controller
+jlclx@sandbox84:~$ kubectl create namespace example
+namespace/example created
+jlclx@sandbox84:~$ kubectl label namespace example runtimeclassname-default=gvisor --overwrite
+namespace/example labeled
+```
 
+### Old example usage:
 ```console
 jlclx@sandbox26:~/git$ kubectl create namespace runtimeclass-controller
 namespace/runtimeclass-controller created
