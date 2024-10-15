@@ -18,10 +18,10 @@ DNS.1 = ${service}
 DNS.2 = ${service}.${namespace}
 DNS.3 = ${service}.${namespace}.svc
 EOF
-openssl req -nodes -new -x509 -keyout $tmp/ca.key -out $tmp/ca.crt -subj "/CN=Runtimeclass Controller CA" 2> /dev/null
+openssl req -nodes -new -x509 -keyout $tmp/ca.key -out $tmp/ca.crt -days 3650 -subj "/CN=Runtimeclass Controller CA" 2> /dev/null
 openssl genrsa -out $tmp/tls.key 2048 2> /dev/null
-openssl req -new -key $tmp/tls.key -config $tmp/san.conf -out $tmp/tls.csr 2> /dev/null
-openssl x509 -req -in $tmp/tls.csr -CA $tmp/ca.crt -CAkey $tmp/ca.key -CAcreateserial -out $tmp/tls.crt -extensions req_ext -extfile $tmp/san.conf 2> /dev/null
+openssl req -new -key $tmp/tls.key -config $tmp/san.conf -out $tmp/tls.csr -days 3650 2> /dev/null
+openssl x509 -req -in $tmp/tls.csr -CA $tmp/ca.crt -CAkey $tmp/ca.key -CAcreateserial -out $tmp/tls.crt -days 3650 -extensions req_ext -extfile $tmp/san.conf 2> /dev/null
 CA_BUNDLE=$(cat $tmp/ca.crt | base64 | tr -d '\n')
 kubectl --namespace runtimeclass-controller create secret tls runtimeclass-controller-certs \
     --cert "$tmp/tls.crt" \
