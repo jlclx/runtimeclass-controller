@@ -1,4 +1,4 @@
-name: GitHub Registry Upload
+name: GitHub Development
 on:
   push:
     branches:

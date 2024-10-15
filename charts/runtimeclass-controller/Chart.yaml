@@ -1,7 +1,8 @@
 apiVersion: v2
 type: application
 name: runtimeclass-controller
-version: v0.0.0
+version: v0.0.1
+appVersion: v0.0.1
 description: An ingress controller for automatically applying a runtimeclass to a namespace.
 sources:
   - https://github.com/jlclx/runtimeclass-controller

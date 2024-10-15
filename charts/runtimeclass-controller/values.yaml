@@ -2,5 +2,4 @@ controller:
   runtimeClassNameKey: runtimeclassname-default
   image:
     repository: ghcr.io/jlclx/runtimeclass-controller
-    tag: latest
     pullPolicy: IfNotPresent
