@@ -87,6 +87,10 @@ webhooks:
     sideEffects: None
     admissionReviewVersions:
       - "v1"
+    namespaceSelector:
+      matchExpressions:
+        - key: runtimeclassname-default
+          operator: Exists
     clientConfig:
       service:
         name: runtimeclass-controller
@@ -99,4 +103,4 @@ webhooks:
         apiVersions: ["*"]
         resources: ["pods", "deployments", "replicasets", "statefulsets", "daemonsets", "jobs", "cronjobs"]
         scope: "Namespaced"
-    failurePolicy: Ignore
+    failurePolicy: Fail
