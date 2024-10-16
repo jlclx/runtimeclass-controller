@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ template "runtimeclass-controller.fullname" . }}-role
+  name: {{ include "runtimeclass-controller.serviceAccountName" . }}
   namespace: {{ .Release.Namespace }}
 rules:
   - apiGroups: [""]

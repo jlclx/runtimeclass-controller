@@ -1,25 +1,37 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ template "runtimeclass-controller.fullname" . }}-deployment
+  name: {{ template "runtimeclass-controller.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ template "runtimeclass-controller.fullname" . }}-deployment
+    {{- include "runtimeclass-controller.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
   selector:
     matchLabels:
-      app: {{ template "runtimeclass-controller.fullname" . }}-deployment
+      {{- include "runtimeclass-controller.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       labels:
-        app: {{ template "runtimeclass-controller.fullname" . }}-deployment
+        {{- include "runtimeclass-controller.selectorLabels" . | nindent 8 }}
     spec:
-      serviceAccountName: {{ template "runtimeclass-controller.fullname" . }}-serviceaccount
+      serviceAccountName: {{ include "runtimeclass-controller.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: controller
-          image: {{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag | default .Chart.AppVersion }}
-          imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -29,12 +41,26 @@ spec:
             - containerPort: 8443
           env:
             - name: RUNTIME_CLASSNAME_KEY
-              value: {{ .Values.controller.runtimeClassNameKey }}
+              value: {{ .Values.webhook.runtimeClassNameKey }}
           volumeMounts:
             - name: webhook-certs
               mountPath: /certs
               readOnly: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
       volumes:
         - name: webhook-certs
           secret:
-            secretName: {{ template "runtimeclass-controller.fullname" . }}-certs
+            secretName: {{ include "runtimeclass-controller.certificateName" . }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

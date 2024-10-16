@@ -1,45 +1,85 @@
-{{- $altNames := list
-  ( printf "%s-service" (include "runtimeclass-controller.fullname" .) )
-  ( printf "%s-service.%s" (include "runtimeclass-controller.fullname" .) .Release.Namespace ) 
-  ( printf "%s-service.%s.svc" (include "runtimeclass-controller.fullname" .) .Release.Namespace )
--}}
-{{- $ca := genCA "Runtimeclass Controller CA" 3650 -}}
-{{- $cert := genSignedCert ( include "runtimeclass-controller.fullname" . ) nil $altNames 3650 $ca -}}
+{{- $secret := lookup "v1" "Secret" .Release.Namespace (include "runtimeclass-controller.certificateName" .) }}
+  {{ $ca := "" }}
+  {{ $key := "" }}
+  {{ $crt := "" }}
+---
+{{- if .Values.webhook.tls.certManagerIssuerRef }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "runtimeclass-controller.fullname" . }}
+  labels:
+  {{- include "runtimeclass-controller.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "runtimeclass-controller.certificateName" . }}
+  dnsNames:
+    - {{ include "runtimeclass-controller.fullname" . }}.{{ .Release.Namespace }}.svc
+  issuerRef:
+  {{- toYaml .Values.webhook.tls.certManagerIssuerRef | nindent 4 }}
+  privateKey:
+    rotationPolicy: Always
+---
+{{- else if .Values.webhook.tls.autogenerate }}
+  {{- if and $secret (not .Values.webhook.tls.renew) }}
+    {{- $ca = get $secret.data "ca.crt" }}
+    {{- $key = get $secret.data "tls.key" }}
+    {{- $crt = get $secret.data "tls.crt" }}
+  {{- else }}
+    {{- $altNames := list
+        ( printf "%s" (include "runtimeclass-controller.fullname" .) )
+        ( printf "%s.%s" (include "runtimeclass-controller.fullname" .) .Release.Namespace )
+        ( printf "%s.%s.svc" (include "runtimeclass-controller.fullname" .) .Release.Namespace )
+      -}}
+    {{- $ca_file := genCA "Runtimeclass Controller CA" 3650 -}}
+    {{- $crt_file := genSignedCert ( include "runtimeclass-controller.fullname" . ) nil $altNames 3650 $ca_file -}}
+    {{- $ca = $ca_file.Cert | b64enc }}
+    {{- $key = $crt_file.Key | b64enc }}
+    {{- $crt = $crt_file.Cert | b64enc }}
+  {{- end }}
 apiVersion: v1
 kind: Secret
 type: kubernetes.io/tls
 metadata:
-  name: {{ template "runtimeclass-controller.fullname" . }}-certs
+  name: {{ include "runtimeclass-controller.certificateName" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ template "runtimeclass-controller.fullname" . }}-deployment
+    {{- include "runtimeclass-controller.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": "pre-install"
     "helm.sh/hook-delete-policy": "before-hook-creation"
 data:
-  tls.crt: {{ $cert.Cert | b64enc }}
-  tls.key: {{ $cert.Key | b64enc }}
+  tls.key: {{ $key }}
+  tls.crt: {{ $crt }}
 ---
+{{- end }}
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: {{ template "runtimeclass-controller.fullname" . }}-webhook
+  name: {{ include "runtimeclass-controller.fullname" . }}
   namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "runtimeclass-controller.labels" . | nindent 4 }}
+  {{- if .Values.webhook.tls.certManagerIssuerRef }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "runtimeclass-controller.fullname" . }}
+  {{- end }}
 webhooks:
-  - name: {{ template "runtimeclass-controller.fullname" . }}-service.{{ .Release.Namespace }}.svc
+  - name: {{ include "runtimeclass-controller.fullname" . }}.{{ .Release.Namespace }}.svc
     sideEffects: None
     admissionReviewVersions:
       - "v1"
     namespaceSelector:
       matchExpressions:
-        - key: {{ .Values.controller.runtimeClassNameKey }}
+        - key: {{ .Values.webhook.runtimeClassNameKey }}
           operator: Exists
     clientConfig:
       service:
-        name: {{ template "runtimeclass-controller.fullname" . }}-service
+        name: {{ template "runtimeclass-controller.fullname" . }}
         namespace: {{ .Release.Namespace }}
         path: "/mutate"
-      caBundle: {{ $ca.Cert | b64enc }}
+      {{- if not .Values.webhook.tls.certManagerIssuerRef }}
+      caBundle: {{ $ca }}
+      {{- end }}
     rules:
       - operations: ["CREATE"]
         apiGroups: ["*"]
